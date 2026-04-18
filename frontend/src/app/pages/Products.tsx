@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router";
-import { Filter, SlidersHorizontal, X, Loader2 } from "lucide-react";
-import api from "../api/api"; //
-import { MOCK_PRODUCTS } from "../data/mockData"; //
-import { ProductCard } from "../components/ProductCard"; //
-import toast from "react-hot-toast"; //
+import { Filter, SlidersHorizontal, X, Loader2, RotateCcw } from "lucide-react";
+import api from "../api/api";
+import { MOCK_PRODUCTS } from "../data/mockData";
+import { ProductCard } from "../components/ProductCard";
+import toast from "react-hot-toast";
 
 export const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,21 +17,23 @@ export const Products = () => {
   const searchQuery = searchParams.get("search") || "";
   const selectedCategory = searchParams.get("category") || "";
   const selectedBrand = searchParams.get("brand") || "";
+  const sortOrder = searchParams.get("sort") || "";
+  
+  // Lấy trực tiếp giá trị từ URL để lọc ngay lập tức
+  const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
-  const maxPrice = maxPriceParam ? parseInt(maxPriceParam, 10) : Infinity;
+  const minPrice = minPriceParam ? parseInt(minPriceParam, 10) : 0;
+  const maxPrice = maxPriceParam ? parseInt(maxPriceParam, 10) : 4000000;
 
-  // Gọi API lấy dữ liệu mỗi khi từ khóa tìm kiếm thay đổi
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setIsLoading(true);
-        // Gửi tham số tìm kiếm trực tiếp lên Backend
         const data: any = await api.get("/products", { 
           params: { search: searchQuery } 
         }); 
         setProducts(data);
       } catch (error) {
-        // Nếu lỗi kết nối, kiểm tra chế độ Mock trong .env
         if (import.meta.env.VITE_USE_MOCK === "true") {
           setProducts(MOCK_PRODUCTS);
         } else {
@@ -46,12 +48,6 @@ export const Products = () => {
 
   const categories = ["Giày", "Áo", "Bóng", "Phụ kiện"];
   const brands = ["Nike", "Adidas", "Puma"];
-  const priceRanges = [
-    { label: "Dưới 1 triệu", value: 1000000 },
-    { label: "Dưới 2 triệu", value: 2000000 },
-    { label: "Dưới 3 triệu", value: 3000000 },
-    { label: "Mọi mức giá", value: Infinity },
-  ];
 
   const updateFilter = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);
@@ -60,14 +56,47 @@ export const Products = () => {
     setSearchParams(newParams);
   };
 
+  // Cập nhật giá trị lên URL ngay khi đang kéo
+  const updatePriceRange = (newMin: number, newMax: number) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newMin > 0) newParams.set("minPrice", newMin.toString());
+    else newParams.delete("minPrice");
+    
+    if (newMax < 4000000) newParams.set("maxPrice", newMax.toString());
+    else newParams.delete("maxPrice");
+    
+    setSearchParams(newParams);
+  };
+
+  // Hàm cho nút "Đặt lại" giá trị
+  const handleResetPrice = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("minPrice");
+    newParams.delete("maxPrice");
+    setSearchParams(newParams);
+  };
+
   const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const matchCategory = selectedCategory ? product.category === selectedCategory : true;
-      const matchBrand = selectedBrand ? product.brand === selectedBrand : true;
-      const matchPrice = product.price <= maxPrice;
+    if (!products || products.length === 0) return [];
+    
+    let result = products.filter(product => {
+      const matchCategory = selectedCategory ? product.category?.toLowerCase() === selectedCategory.toLowerCase() : true;
+      const matchBrand = selectedBrand ? product.brand?.toLowerCase() === selectedBrand.toLowerCase() : true;
+      
+      const productPrice = typeof product.price === 'number' ? product.price : 0;
+      const matchPrice = productPrice >= minPrice && productPrice <= maxPrice;
+      
       return matchCategory && matchBrand && matchPrice;
     });
-  }, [products, selectedCategory, selectedBrand, maxPrice]);
+
+    if (sortOrder === "asc") {
+      result.sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (sortOrder === "desc") {
+      result.sort((a, b) => (b.price || 0) - (a.price || 0));
+    }
+
+    return result;
+  }, [products, selectedCategory, selectedBrand, minPrice, maxPrice, sortOrder]);
 
   const FilterSidebar = () => (
     <div className="space-y-8">
@@ -76,66 +105,95 @@ export const Products = () => {
           <Filter className="w-5 h-5" /> Bộ Lọc
         </h3>
         
-        {/* Lọc theo Danh mục */}
         <div className="mb-6">
           <h4 className="font-semibold mb-3 text-slate-800">Danh mục</h4>
           <div className="space-y-2">
-            <button 
-              onClick={() => updateFilter("category", "")}
-              className={`block w-full text-left text-sm ${!selectedCategory ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}
-            >
+            <button onClick={() => updateFilter("category", "")} className={`block w-full text-left text-sm ${!selectedCategory ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}>
               Tất cả danh mục
             </button>
             {categories.map(cat => (
-              <button 
-                key={cat}
-                onClick={() => updateFilter("category", cat)}
-                className={`block w-full text-left text-sm ${selectedCategory === cat ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}
-              >
+              <button key={cat} onClick={() => updateFilter("category", cat)} className={`block w-full text-left text-sm ${selectedCategory === cat ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}>
                 {cat}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Lọc theo Thương hiệu */}
         <div className="mb-6">
           <h4 className="font-semibold mb-3 text-slate-800">Thương hiệu</h4>
           <div className="space-y-2">
-            <button 
-              onClick={() => updateFilter("brand", "")}
-              className={`block w-full text-left text-sm ${!selectedBrand ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}
-            >
+            <button onClick={() => updateFilter("brand", "")} className={`block w-full text-left text-sm ${!selectedBrand ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}>
               Tất cả thương hiệu
             </button>
             {brands.map(brand => (
-              <button 
-                key={brand}
-                onClick={() => updateFilter("brand", brand)}
-                className={`block w-full text-left text-sm ${selectedBrand === brand ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}
-              >
+              <button key={brand} onClick={() => updateFilter("brand", brand)} className={`block w-full text-left text-sm ${selectedBrand === brand ? "text-orange-600 font-medium" : "text-slate-600 hover:text-orange-600"}`}>
                 {brand}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Lọc theo Mức giá */}
+        {/* THANH TRƯỢT KÉP (REAL-TIME UPDATE) CÓ NÚT RESET - ĐÃ FIX CSS */}
         <div>
-          <h4 className="font-semibold mb-3 text-slate-800">Mức giá</h4>
-          <div className="space-y-2">
-            {priceRanges.map(range => (
-              <label key={range.value} className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="price" 
-                  checked={maxPrice === range.value}
-                  onChange={() => updateFilter("maxPrice", range.value === Infinity ? "" : range.value.toString())}
-                  className="text-orange-600 focus:ring-orange-500"
-                />
-                <span className="text-sm text-slate-600">{range.label}</span>
-              </label>
-            ))}
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="font-semibold text-slate-800 text-base">Mức giá</h4>
+            {(minPrice > 0 || maxPrice < 4000000) && (
+              <button 
+                onClick={handleResetPrice}
+                className="text-xs flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" /> Đặt lại
+              </button>
+            )}
+          </div>
+          
+          <div className="mb-4 flex items-center justify-between text-sm font-medium text-orange-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-100">
+            <span>{new Intl.NumberFormat('vi-VN').format(minPrice)}đ</span>
+            <span>-</span>
+            <span>{new Intl.NumberFormat('vi-VN').format(maxPrice)}đ</span>
+          </div>
+          
+          {/* VÙNG CHỨA THANH TRƯỢT ĐÃ ĐƯỢC CĂN CHỈNH LẠI TRỌNG TÂM */}
+          <div className="relative w-full h-5 mt-6 mb-2">
+            {/* Thanh xám nền */}
+            <div className="absolute top-1.5 left-0 w-full h-2 bg-slate-200 rounded-lg pointer-events-none"></div>
+
+            {/* Dải màu cam ở giữa */}
+            <div 
+              className="absolute top-1.5 h-2 bg-orange-500 rounded-lg pointer-events-none"
+              style={{ 
+                left: `${(minPrice / 4000000) * 100}%`, 
+                right: `${100 - (maxPrice / 4000000) * 100}%` 
+              }}
+            ></div>
+            
+            {/* Nút Min */}
+            <input 
+              type="range" 
+              min="0" max="4000000" step="500000"
+              value={minPrice}
+              onChange={(e) => {
+                const val = Math.min(Number(e.target.value), maxPrice - 500000);
+                updatePriceRange(val, maxPrice);
+              }}
+              className="absolute top-0 left-0 w-full h-5 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-orange-600 [&::-webkit-slider-thumb]:rounded-full cursor-pointer z-10"
+            />
+
+            {/* Nút Max */}
+            <input 
+              type="range" 
+              min="0" max="4000000" step="500000"
+              value={maxPrice}
+              onChange={(e) => {
+                const val = Math.max(Number(e.target.value), minPrice + 500000);
+                updatePriceRange(minPrice, val);
+              }}
+              className="absolute top-0 left-0 w-full h-5 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-orange-600 [&::-webkit-slider-thumb]:rounded-full cursor-pointer z-20"
+            />
+          </div>
+          <div className="flex justify-between text-xs text-slate-400 font-medium mt-2">
+            <span>0đ</span>
+            <span>4Tr</span>
           </div>
         </div>
       </div>
@@ -151,14 +209,12 @@ export const Products = () => {
       )}
 
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar máy tính */}
         <aside className="hidden md:block w-64 flex-shrink-0">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-24">
             <FilterSidebar />
           </div>
         </aside>
 
-        {/* Thanh lọc điện thoại */}
         <div className="md:hidden flex justify-between items-center bg-white p-4 rounded-xl border border-slate-100 mb-4">
           <span className="font-medium text-slate-700">{filteredProducts.length} Sản phẩm</span>
           <button onClick={() => setIsMobileFilterOpen(true)} className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg font-medium text-sm">
@@ -166,13 +222,27 @@ export const Products = () => {
           </button>
         </div>
 
-        {/* Danh sách sản phẩm */}
         <div className="flex-grow">
           <div className="mb-6 hidden md:flex justify-between items-center">
-            <h2 className="text-xl font-bold text-slate-800">
-              {selectedCategory ? `Sản phẩm ${selectedCategory}` : "Tất cả sản phẩm"}
-            </h2>
-            <span className="text-slate-500 text-sm">Hiển thị {filteredProducts.length} sản phẩm</span>
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">
+                {selectedCategory ? `Sản phẩm ${selectedCategory}` : "Tất cả sản phẩm"}
+              </h2>
+              <span className="text-slate-500 text-sm">Hiển thị {filteredProducts.length} sản phẩm</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-600">Sắp xếp:</span>
+              <select 
+                className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2 outline-none cursor-pointer"
+                value={sortOrder}
+                onChange={(e) => updateFilter("sort", e.target.value)}
+              >
+                <option value="">Mới nhất</option>
+                <option value="asc">Giá: Thấp đến Cao</option>
+                <option value="desc">Giá: Cao xuống Thấp</option>
+              </select>
+            </div>
           </div>
 
           {isLoading ? (
@@ -190,7 +260,7 @@ export const Products = () => {
             <div className="text-center py-20 bg-white rounded-2xl border border-slate-100">
               <div className="text-slate-400 mb-4 flex justify-center"><Filter className="w-12 h-12" /></div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">Không tìm thấy sản phẩm nào</h3>
-              <p className="text-slate-500 mb-6">Hệ thống đang cập nhật hoặc chưa kết nối dữ liệu.</p>
+              <p className="text-slate-500 mb-6">Bạn hãy thử mở rộng mức giá hoặc bỏ bớt bộ lọc nhé.</p>
               <button 
                 onClick={() => setSearchParams(new URLSearchParams())}
                 className="bg-orange-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-700"
@@ -202,7 +272,7 @@ export const Products = () => {
         </div>
       </div>
 
-      {/* Menu lọc di động */}
+      {/* Menu cho điện thoại */}
       {isMobileFilterOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileFilterOpen(false)}></div>
@@ -213,7 +283,22 @@ export const Products = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            
+            <div className="mb-6">
+               <h4 className="font-semibold mb-3 text-slate-800">Sắp xếp theo</h4>
+               <select 
+                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg block p-2.5 outline-none"
+                value={sortOrder}
+                onChange={(e) => updateFilter("sort", e.target.value)}
+              >
+                <option value="">Mới nhất (Mặc định)</option>
+                <option value="asc">Giá: Thấp đến Cao</option>
+                <option value="desc">Giá: Cao xuống Thấp</option>
+              </select>
+            </div>
+
             <div className="flex-grow"><FilterSidebar /></div>
+            
             <div className="mt-8 pt-4 border-t flex gap-4">
               <button onClick={() => { setSearchParams(new URLSearchParams()); setIsMobileFilterOpen(false); }} className="flex-1 py-3 border border-slate-300 rounded-lg font-medium">Xóa lọc</button>
               <button onClick={() => setIsMobileFilterOpen(false)} className="flex-1 py-3 bg-orange-600 text-white rounded-lg font-medium">Áp dụng</button>
