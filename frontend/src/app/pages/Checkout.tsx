@@ -1,10 +1,25 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { CheckCircle2, Package, MapPin, CreditCard, Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  Package,
+  MapPin,
+  CreditCard,
+  Loader2,
+  Copy,
+  Check,
+} from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatPrice } from "../data/mockData";
 import api from "../api/api";
+
+const BANK_INFO = {
+  bankName: "TP Bank",
+  bankCode: "tpbank",
+  accountNumber: "0867788204",
+  accountName: "CHU DUC NHAT MINH",
+};
 
 export const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
@@ -14,6 +29,12 @@ export const Checkout = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const [paymentSnapshot, setPaymentSnapshot] = useState<{
+    amount: number;
+    transferContent: string;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -38,17 +59,67 @@ export const Checkout = () => {
     }
   }, [items.length, isSuccess, navigate]);
 
+  const previewOrderCode = useMemo(() => {
+    return `VNSP-${Date.now().toString().slice(-6)}`;
+  }, []);
+
+  const transferContent = useMemo(() => {
+    return paymentSnapshot?.transferContent ?? previewOrderCode;
+  }, [paymentSnapshot, previewOrderCode]);
+
+  const qrUrl = useMemo(() => {
+    const amount = Math.round(paymentSnapshot?.amount ?? totalPrice ?? 0);
+    const encodedAccountName = encodeURIComponent(BANK_INFO.accountName);
+    const encodedNote = encodeURIComponent(transferContent);
+
+    return `https://img.vietqr.io/image/${BANK_INFO.bankCode}-${BANK_INFO.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodedNote}&accountName=${encodedAccountName}`;
+  }, [paymentSnapshot, totalPrice, transferContent]);
+
+  const successAmount = paymentSnapshot?.amount ?? totalPrice;
+  const successTransferContent =
+    paymentSnapshot?.transferContent ?? transferContent;
+
+  const successQrUrl = useMemo(() => {
+    const amount = Math.round(paymentSnapshot?.amount ?? totalPrice ?? 0);
+    const encodedAccountName = encodeURIComponent(BANK_INFO.accountName);
+    const encodedNote = encodeURIComponent(successTransferContent);
+
+    return `https://img.vietqr.io/image/${BANK_INFO.bankCode}-${BANK_INFO.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodedNote}&accountName=${encodedAccountName}`;
+  }, [paymentSnapshot, totalPrice, successTransferContent]);
+
+  const copyText = async (value: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1500);
+    } catch (error) {
+      console.error("Không sao chép được:", error);
+      alert("Không sao chép được nội dung.");
+    }
+  };
+
   if (items.length === 0 && !isSuccess) {
     return null;
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
+
+    const snapshot = {
+      amount: totalPrice,
+      transferContent,
+    };
+    setPaymentSnapshot(snapshot);
 
     const orderData = {
       customer: {
@@ -73,7 +144,13 @@ export const Checkout = () => {
     try {
       const response: any = await api.post("/orders", orderData);
 
-      setOrderId(response.id || response.orderId || "VS" + Math.floor(Math.random() * 100000));
+      setOrderId(
+        String(
+          response?.id ||
+            response?.orderId ||
+            "VS" + Math.floor(Math.random() * 100000)
+        )
+      );
       setIsSuccess(true);
       clearCart();
     } catch (error: any) {
@@ -84,7 +161,11 @@ export const Checkout = () => {
         setIsSuccess(true);
         clearCart();
       } else {
-        alert(error?.message || error?.response?.data?.message || "Lỗi kết nối hệ thống, không thể đặt hàng!");
+        alert(
+          error?.message ||
+            error?.response?.data?.message ||
+            "Lỗi kết nối hệ thống, không thể đặt hàng!"
+        );
       }
     } finally {
       setIsProcessing(false);
@@ -107,8 +188,53 @@ export const Checkout = () => {
             Cảm ơn bạn đã mua sắm tại VinSport. Mã đơn hàng của bạn là:
             <span className="font-bold text-orange-600 ml-2">#{orderId}</span>
             <br />
-            Chúng tôi sẽ liên hệ với bạn sớm nhất để xác nhận.
+            {formData.paymentMethod === "banking"
+              ? "Vui lòng chuyển khoản đúng số tiền và nội dung để chúng tôi xác nhận thanh toán."
+              : "Chúng tôi sẽ liên hệ với bạn sớm nhất để xác nhận."}
           </p>
+
+          {formData.paymentMethod === "banking" && (
+            <div className="mb-8 rounded-2xl border border-orange-200 bg-orange-50 p-6 text-left">
+              <h3 className="text-xl font-bold text-slate-900 mb-4">
+                Thông tin chuyển khoản
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="space-y-3 text-sm text-slate-700">
+                  <p>
+                    <strong>Ngân hàng:</strong> {BANK_INFO.bankName}
+                  </p>
+                  <p>
+                    <strong>Số tài khoản:</strong> {BANK_INFO.accountNumber}
+                  </p>
+                  <p>
+                    <strong>Chủ tài khoản:</strong> {BANK_INFO.accountName}
+                  </p>
+                  <p>
+                    <strong>Số tiền:</strong>{" "}
+                    <span className="text-orange-600 font-bold">
+                      {formatPrice(successAmount)}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Nội dung CK:</strong>{" "}
+                    <span className="font-bold">{successTransferContent}</span>
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <img
+                    src={successQrUrl}
+                    alt="QR chuyển khoản"
+                    className="w-56 h-56 object-contain rounded-xl border bg-white p-2"
+                  />
+                  <p className="text-xs text-slate-500 mt-3 text-center">
+                    Quét mã để chuyển khoản nhanh
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
@@ -204,7 +330,9 @@ export const Checkout = () => {
                     onChange={handleInputChange}
                     className="hidden"
                   />
-                  <span className="font-bold block">Thanh toán khi nhận hàng (COD)</span>
+                  <span className="font-bold block">
+                    Thanh toán khi nhận hàng (COD)
+                  </span>
                 </label>
 
                 <label
@@ -223,8 +351,154 @@ export const Checkout = () => {
                     className="hidden"
                   />
                   <span className="font-bold block">Chuyển khoản ngân hàng</span>
+                  <span className="text-sm text-slate-500 block mt-1">
+                    Quét mã QR hoặc chuyển khoản đúng nội dung để xác nhận thanh
+                    toán.
+                  </span>
                 </label>
               </div>
+
+              {formData.paymentMethod === "banking" && (
+                <div className="mt-6 rounded-2xl border border-orange-200 bg-orange-50 p-5">
+                  <h3 className="text-lg font-bold text-slate-900 mb-4">
+                    Thông tin chuyển khoản
+                  </h3>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-6 items-start">
+                    <div className="space-y-4">
+                      <div className="rounded-xl bg-white border p-4">
+                        <p className="text-sm text-slate-500 mb-1">Ngân hàng</p>
+                        <p className="font-bold text-slate-900">
+                          {BANK_INFO.bankName}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-white border p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm text-slate-500 mb-1">
+                              Số tài khoản
+                            </p>
+                            <p className="font-bold text-slate-900">
+                              {BANK_INFO.accountNumber}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyText(BANK_INFO.accountNumber, "accountNumber")
+                            }
+                            className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm font-medium flex items-center gap-2"
+                          >
+                            {copiedField === "accountNumber" ? (
+                              <>
+                                <Check className="w-4 h-4 text-green-600" />
+                                Đã copy
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-4 h-4" />
+                                Sao chép
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-white border p-4">
+                        <p className="text-sm text-slate-500 mb-1">
+                          Chủ tài khoản
+                        </p>
+                        <p className="font-bold text-slate-900">
+                          {BANK_INFO.accountName}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-white border p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm text-slate-500 mb-1">
+                              Số tiền
+                            </p>
+                            <p className="font-bold text-orange-600 text-lg">
+                              {formatPrice(paymentSnapshot?.amount ?? totalPrice)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyText(
+                                String(
+                                  Math.round(
+                                    paymentSnapshot?.amount ?? totalPrice ?? 0
+                                  )
+                                ),
+                                "amount"
+                              )
+                            }
+                            className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm font-medium flex items-center gap-2"
+                          >
+                            {copiedField === "amount" ? (
+                              <>
+                                <Check className="w-4 h-4 text-green-600" />
+                                Đã copy
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-4 h-4" />
+                                Sao chép
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-white border p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm text-slate-500 mb-1">
+                              Nội dung chuyển khoản
+                            </p>
+                            <p className="font-bold text-slate-900 break-all">
+                              {transferContent}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyText(transferContent, "transferContent")
+                            }
+                            className="px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm font-medium flex items-center gap-2"
+                          >
+                            {copiedField === "transferContent" ? (
+                              <>
+                                <Check className="w-4 h-4 text-green-600" />
+                                Đã copy
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-4 h-4" />
+                                Sao chép
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white border p-4 flex flex-col items-center">
+                      <img
+                        src={qrUrl}
+                        alt="QR chuyển khoản"
+                        className="w-48 h-48 object-contain"
+                      />
+                      <p className="text-xs text-slate-500 mt-3 text-center leading-relaxed">
+                        Quét mã QR để chuyển khoản nhanh
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
