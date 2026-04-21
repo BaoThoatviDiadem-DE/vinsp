@@ -53,7 +53,12 @@ CREATE TABLE Colors (
 -- ======================
 CREATE TABLE Sizes (
     size_id INT IDENTITY PRIMARY KEY,
-    name NVARCHAR(10) NOT NULL UNIQUE
+    name NVARCHAR(10) NOT NULL UNIQUE,
+
+    CHECK (name IN (
+        N'S', N'M', N'L', N'XL', N'XXL',
+        N'40', N'41', N'42', N'43', N'44', N'45'
+    ))
 );
 
 -- ======================

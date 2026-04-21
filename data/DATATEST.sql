@@ -34,7 +34,13 @@ VALUES
 (N'M'),
 (N'L'),
 (N'XL'),
-(N'XXL');
+(N'XXL'),
+(N'40'),
+(N'41'),
+(N'42'),
+(N'43'),
+(N'44'),
+(N'45');
 
 --5. USERS
 -- role không cần insert vì mặc định database sẽ gán là N'user'
@@ -63,7 +69,7 @@ VALUES
 (N'Áo gym Adidas Pro', N'Áo tập gym co giãn tốt', 2, 2),
 (N'Quần short Puma Run', N'Quần chạy bộ nhẹ', 3, 3),
 (N'Giày chạy Adidas Ultraboost', N'Giày chạy cao cấp', 2, 5),
-(N'Áo khoác Nike Windrunner', N'Áo khoác chống gió', 1, 6),
+(N'Áo khoác Nike Windrunner', N'Áo khoác chống gió', 1, 6), 
 (N'Quần dài Reebok Training', N'Quần tập luyện', 4, 4),
 (N'Áo gym Under Armour HeatGear', N'Áo thể thao ôm sát', 5, 2),
 (N'Giày chạy Puma Velocity', N'Giày chạy nhẹ', 3, 5),
@@ -78,7 +84,7 @@ VALUES
 (N'Áo bóng đá Puma Future 2026', N'Áo bóng đá thoáng khí, thiết kế trẻ trung', 3, 1),
 (N'Áo gym Nike Dri-FIT Elite', N'Áo gym thấm hút mồ hôi, co giãn tốt', 1, 2),
 (N'Quần short Adidas Runner', N'Quần short chạy bộ nhẹ, thoải mái khi vận động', 2, 3),
-(N'Giày chạy Nike Air Zoom', N'Giày chạy bộ đệm êm, hỗ trợ bám đường tốt', 1, 5),
+(N'Giày chạy Nike Air Zoom', N'Giày chạy bộ đệm êm, hỗ trợ bám đường tốt', 1, 5), --sai mau (den)
 (N'Áo khoác Under Armour Storm', N'Áo khoác thể thao chống gió, chống nước nhẹ', 5, 6),
 (N'Quần dài Puma Training Pro', N'Quần dài thể thao mềm mại, phù hợp tập luyện', 3, 4);
 
@@ -97,11 +103,11 @@ VALUES
 (3, 3, 2, 280000, 45),
 (3, 4, 6, 280000, 20),
 
-(4, 2, 2, 2500000, 10),
-(4, 3, 1, 2500000, 8),
-(4, 4, 3, 2500000, 5),
+(4, 7, 1, 2500000, 10),
+(4, 8, 1, 2500000, 8),
+(4, 9, 3, 2500000, 5),
 
-(5, 1, 4, 900000, 12),
+(5, 1, 1, 900000, 12),
 (5, 2, 1, 900000, 18),
 
 (6, 2, 6, 400000, 25),
@@ -110,8 +116,8 @@ VALUES
 (7, 1, 2, 320000, 30),
 (7, 2, 3, 320000, 28),
 
-(8, 3, 1, 1500000, 15),
-(8, 4, 2, 1500000, 10),
+(8, 9, 1, 1500000, 15),
+(8, 10, 2, 1500000, 10),
 
 (9, 2, 3, 500000, 22),
 (9, 3, 1, 500000, 18),
@@ -119,17 +125,17 @@ VALUES
 (10, 1, 5, 300000, 40),
 (10, 2, 6, 300000, 35),
 
-(11, 3, 4, 600000, 20),
+(11, 3, 1, 600000, 20),
 (11, 4, 1, 600000, 15),
 
-(12, 2, 2, 1200000, 12),
-(12, 3, 3, 1200000, 10);
+(12, 7, 2, 1200000, 12),
+(12, 9, 3, 1200000, 10);
 
 -- THÊM SẢN PHẨM
 INSERT INTO ProductVariants (product_id, size_id, color_id, price, stock)
 VALUES
 -- 13. Áo bóng đá Puma Future 2026
-(13, 1, 1, 480000, 20),
+(13, 1, 3, 480000, 20),
 (13, 2, 2, 480000, 25),
 (13, 3, 4, 480000, 18),
 
@@ -144,9 +150,9 @@ VALUES
 (15, 4, 2, 310000, 20),
 
 -- 16. Giày chạy Nike Air Zoom
-(16, 2, 2, 2200000, 12),
-(16, 3, 1, 2200000, 10),
-(16, 4, 4, 2200000, 8),
+(16, 6, 1, 2200000, 12),
+(16, 8, 1, 2200000, 10),
+(16, 10, 4, 2200000, 8),
 
 -- 17. Áo khoác Under Armour Storm
 (17, 2, 1, 950000, 15),
