@@ -198,23 +198,23 @@ export const ProductDetail = () => {
         setProduct(data);
         setMainImage(data.images?.[0] || data.image || "");
 
-        const normalizedSizes = parseSizes(data.sizes);
+        const normalized = parseSizes(data.sizes);
 
         if (data.variants && data.variants.length > 0) {
           const firstVariant = data.variants[0];
-          setSelectedSize(firstVariant.size || normalizedSizes[0] || "");
+          setSelectedSize(firstVariant.size || normalized[0] || "");
           setSelectedColor(firstVariant.color || data.colors?.[0]?.name || "");
         } else {
-          setSelectedSize(normalizedSizes[0] || "");
+          setSelectedSize(normalized[0] || "");
           setSelectedColor(data.colors?.[0]?.name || "");
         }
       } catch (error) {
         console.error("Không tải được chi tiết sản phẩm:", error);
 
         if (import.meta.env.VITE_USE_MOCK === "true") {
-          const fallback = MOCK_PRODUCTS.find((p: any) => String(p.id) === String(id)) as
-            | Product
-            | undefined;
+          const fallback = MOCK_PRODUCTS.find(
+            (p: any) => String(p.id) === String(id)
+          ) as Product | undefined;
 
           if (fallback) {
             setProduct(fallback);
@@ -256,7 +256,7 @@ export const ProductDetail = () => {
     return parseSizes(product.sizes);
   }, [product]);
 
-  const availableSizes = useMemo<string[]>(() => {
+  const currentColorAvailableSizes = useMemo<string[]>(() => {
     if (!product) return [];
 
     if (product.variants && product.variants.length > 0) {
@@ -277,6 +277,21 @@ export const ProductDetail = () => {
 
     return normalizedSizes;
   }, [product, selectedColor, normalizedSizes]);
+
+  const allSizes = useMemo<string[]>(() => {
+    if (!product) return [];
+
+    const fromProductSizes = normalizedSizes;
+
+    const fromVariants =
+      product.variants && product.variants.length > 0
+        ? product.variants
+            .map((variant: ProductVariant) => variant.size)
+            .filter((size): size is string => Boolean(size))
+        : [];
+
+    return [...new Set([...fromProductSizes, ...fromVariants])];
+  }, [product, normalizedSizes]);
 
   const availableColors = useMemo<ProductColor[]>(() => {
     if (!product) return [];
@@ -326,17 +341,21 @@ export const ProductDetail = () => {
   }, [product]);
 
   const guideSizes = useMemo<string[]>(() => {
-    if (availableSizes.length > 0) return availableSizes;
+    if (allSizes.length > 0) return allSizes;
     return isShoeProduct ? defaultShoeGuideSizes : defaultGuideSizes;
-  }, [availableSizes, isShoeProduct]);
+  }, [allSizes, isShoeProduct]);
 
   useEffect(() => {
     if (!product?.variants || product.variants.length === 0) return;
 
-    if (!availableSizes.includes(selectedSize) && availableSizes.length > 0) {
-      setSelectedSize(availableSizes[0]);
+    if (
+      selectedSize &&
+      !currentColorAvailableSizes.includes(selectedSize) &&
+      currentColorAvailableSizes.length > 0
+    ) {
+      setSelectedSize(currentColorAvailableSizes[0]);
     }
-  }, [availableSizes, selectedSize, product]);
+  }, [currentColorAvailableSizes, selectedSize, product]);
 
   useEffect(() => {
     if (!product?.variants || product.variants.length === 0) return;
@@ -388,7 +407,7 @@ export const ProductDetail = () => {
       return;
     }
 
-    if (availableSizes.length > 0 && !selectedSize) {
+    if (allSizes.length > 0 && !selectedSize) {
       alert("Vui lòng chọn kích cỡ!");
       return;
     }
@@ -536,26 +555,41 @@ export const ProductDetail = () => {
                 </div>
               )}
 
-              {availableSizes.length > 0 && (
+              {allSizes.length > 0 && (
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-slate-900 mb-3">
                     Kích cỡ
                   </h3>
 
                   <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {availableSizes.map((size: string, index: number) => (
-                      <button
-                        key={index}
-                        onClick={() => setSelectedSize(size)}
-                        className={`px-4 py-3 min-w-[3rem] text-sm font-medium border transition-all ${
-                          selectedSize === size
-                            ? "bg-slate-900 text-white border-slate-900"
-                            : "bg-slate-100 text-slate-700 border-slate-200 hover:border-orange-600 hover:text-orange-600"
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
+                    {allSizes.map((size: string, index: number) => {
+                      const isAvailable = currentColorAvailableSizes.includes(size);
+                      const isSelected = selectedSize === size;
+
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            if (isAvailable) setSelectedSize(size);
+                          }}
+                          disabled={!isAvailable}
+                          className={`px-4 py-3 min-w-[3rem] text-sm font-medium border transition-all ${
+                            isSelected
+                              ? "bg-slate-900 text-white border-slate-900"
+                              : isAvailable
+                              ? "bg-slate-100 text-slate-700 border-slate-200 hover:border-orange-600 hover:text-orange-600"
+                              : "bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-60"
+                          }`}
+                          title={
+                            isAvailable
+                              ? size
+                              : `Size ${size} không có ở màu đang chọn`
+                          }
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <button
@@ -734,9 +768,7 @@ export const ProductDetail = () => {
                   <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600">
                     <li>Đo chiều dài bàn chân từ gót đến đầu ngón dài nhất.</li>
                     <li>Nên đo vào cuối ngày để có kích thước sát thực tế hơn.</li>
-                    <li>
-                      Nếu nằm giữa 2 size, ưu tiên size lớn hơn để đi thoải mái.
-                    </li>
+                    <li>Nếu nằm giữa 2 size, ưu tiên size lớn hơn để đi thoải mái.</li>
                   </ul>
                 </div>
               </>
@@ -822,8 +854,8 @@ export const ProductDetail = () => {
                     <li>Đo ngực, eo, hông sát cơ thể nhưng không siết quá chặt.</li>
                     <li>Nếu số đo nằm giữa 2 size, ưu tiên size lớn hơn để mặc thoải mái.</li>
                     <li>
-                      Với đồ thể thao form ôm, chọn đúng size; với form rộng, có thể tăng 1
-                      size.
+                      Với đồ thể thao form ôm, chọn đúng size; với form rộng, có thể tăng
+                      1 size.
                     </li>
                   </ul>
                 </div>
