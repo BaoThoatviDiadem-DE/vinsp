@@ -28,13 +28,6 @@ export const Footer = () => {
           </ul>
         </div>
 
-        <div>
-          <h3 className="text-white font-bold mb-4 uppercase text-sm tracking-wider">Hỗ trợ khách hàng</h3>
-          <ul className="space-y-2 text-sm">
-            <li><Link to="/tracking" className="hover:text-white transition-colors">Theo dõi đơn hàng</Link></li>
-            <li><a href="#" className="hover:text-white transition-colors">Hướng dẫn chọn size</a></li>
-          </ul>
-        </div>
 
         <div>
           <h3 className="text-white font-bold mb-4 uppercase text-sm tracking-wider">Liên hệ</h3>
