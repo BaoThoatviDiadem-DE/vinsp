@@ -26,31 +26,6 @@ type AdminOrder = {
 
 type SearchField = "all" | "id" | "customerName" | "phone" | "paymentMethod";
 
-const MOCK_ORDERS: AdminOrder[] = [
-  {
-    id: 9,
-    customerName: "anhemtoi",
-    phone: "12334234",
-    address: "hà nội, Hà Nội",
-    totalAmount: 420000,
-    paymentMethod: "banking",
-    paymentStatus: "pending",
-    orderStatus: "pending",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 8,
-    customerName: "anhemtoi",
-    phone: "12334234",
-    address: "hà nội, Hà Nội",
-    totalAmount: 950000,
-    paymentMethod: "banking",
-    paymentStatus: "pending",
-    orderStatus: "pending",
-    createdAt: new Date().toISOString(),
-  },
-];
-
 const PAYMENT_STATUS_OPTIONS = [
   { value: "pending", label: "Chờ xác nhận" },
   { value: "paid", label: "Đã thanh toán" },
@@ -138,7 +113,6 @@ export default function AdminOrders() {
   const [isLoading, setIsLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
-  const [savingId, setSavingId] = useState<number | string | null>(null);
 
   const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>([]);
   const [orderStatusFilters, setOrderStatusFilters] = useState<string[]>([]);
@@ -149,26 +123,18 @@ export default function AdminOrders() {
   const [paymentFilterKeyword, setPaymentFilterKeyword] = useState("");
   const [orderFilterKeyword, setOrderFilterKeyword] = useState("");
 
+  const [savingId, setSavingId] = useState<number | string | null>(null);
+
   const loadOrders = async () => {
     try {
       setIsLoading(true);
-
-      try {
-        const data = await api.get("/admin/orders");
-        const normalized = toArray(data).map(normalizeOrder);
-        setOrders(normalized.length > 0 ? normalized : MOCK_ORDERS);
-      } catch {
-        try {
-          const data = await api.get("/orders");
-          const normalized = toArray(data).map(normalizeOrder);
-          setOrders(normalized.length > 0 ? normalized : MOCK_ORDERS);
-        } catch {
-          setOrders(MOCK_ORDERS);
-        }
-      }
+      const data = await api.get("/admin/orders");
+      const normalized = toArray(data).map(normalizeOrder);
+      setOrders(normalized);
     } catch (error) {
       console.error("Lỗi tải đơn hàng:", error);
-      setOrders(MOCK_ORDERS);
+      alert("Không tải được danh sách đơn hàng");
+      setOrders([]);
     } finally {
       setIsLoading(false);
     }
@@ -183,7 +149,8 @@ export default function AdminOrders() {
     if (!q) return PAYMENT_STATUS_OPTIONS;
     return PAYMENT_STATUS_OPTIONS.filter(
       (item) =>
-        item.label.toLowerCase().includes(q) || item.value.toLowerCase().includes(q)
+        item.label.toLowerCase().includes(q) ||
+        item.value.toLowerCase().includes(q)
     );
   }, [paymentFilterKeyword]);
 
@@ -192,7 +159,8 @@ export default function AdminOrders() {
     if (!q) return ORDER_STATUS_OPTIONS;
     return ORDER_STATUS_OPTIONS.filter(
       (item) =>
-        item.label.toLowerCase().includes(q) || item.value.toLowerCase().includes(q)
+        item.label.toLowerCase().includes(q) ||
+        item.value.toLowerCase().includes(q)
     );
   }, [orderFilterKeyword]);
 
@@ -285,26 +253,17 @@ export default function AdminOrders() {
     try {
       setSavingId(order.id);
 
-      try {
-        await api.put(`/admin/orders/${order.id}`, {
-          paymentStatus: order.paymentStatus,
-          orderStatus: order.orderStatus,
-        });
-      } catch {
-        try {
-          await api.put(`/orders/${order.id}`, {
-            paymentStatus: order.paymentStatus,
-            orderStatus: order.orderStatus,
-          });
-        } catch {
-          // demo fallback
-        }
-      }
+      await api.put(`/admin/orders/${order.id}`, {
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.orderStatus,
+        paymentMethod: order.paymentMethod,
+      });
 
       alert("Cập nhật đơn hàng thành công.");
-    } catch (error) {
+      await loadOrders();
+    } catch (error: any) {
       console.error("Lỗi cập nhật đơn hàng:", error);
-      alert("Không cập nhật được đơn hàng.");
+      alert(error?.response?.data?.message || "Không cập nhật được đơn hàng.");
     } finally {
       setSavingId(null);
     }
@@ -517,7 +476,7 @@ export default function AdminOrders() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] border-collapse">
+            <table className="w-full min-w-[1240px] border-collapse">
               <thead>
                 <tr className="bg-slate-100 text-left">
                   <th className="p-3 border-b min-w-[90px]">Mã đơn</th>
@@ -527,9 +486,7 @@ export default function AdminOrders() {
                   <th className="p-3 border-b min-w-[190px]">TT thanh toán</th>
                   <th className="p-3 border-b min-w-[190px]">TT đơn hàng</th>
                   <th className="p-3 border-b min-w-[130px]">Ngày tạo</th>
-                  <th className="p-3 border-b min-w-[140px] sticky right-0 bg-slate-100 z-10 shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.08)]">
-                    Thao tác
-                  </th>
+                  <th className="p-3 border-b min-w-[140px]">Thao tác</th>
                 </tr>
               </thead>
 
@@ -574,11 +531,7 @@ export default function AdminOrders() {
                       <select
                         value={order.paymentStatus}
                         onChange={(e) =>
-                          handleFieldChange(
-                            order.id,
-                            "paymentStatus",
-                            e.target.value
-                          )
+                          handleFieldChange(order.id, "paymentStatus", e.target.value)
                         }
                         className="w-full border rounded-lg px-3 py-2"
                       >
@@ -618,11 +571,11 @@ export default function AdminOrders() {
                       {formatDate(order.createdAt)}
                     </td>
 
-                    <td className="p-3 border-b sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.08)]">
+                    <td className="p-3 border-b whitespace-nowrap">
                       <button
                         onClick={() => handleUpdateOrder(order)}
                         disabled={savingId === order.id}
-                        className="px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60 whitespace-nowrap"
+                        className="px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
                       >
                         {savingId === order.id ? "Đang lưu..." : "Cập nhật"}
                       </button>
